@@ -10,6 +10,8 @@ import javafx.event.EventHandler;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
@@ -23,13 +25,14 @@ import javafx.util.Duration;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.LongToDoubleFunction;
-
+import java.util.concurrent.atomic.AtomicReference;
 
 
 /**
@@ -58,12 +61,10 @@ public class PeliSetuppi extends ImageView {
     private Group kuvaRyhma = new Group();
 
 
-
-
-    public PeliSetuppi(){
+    public PeliSetuppi() {
 
         peliPane = new AnchorPane();
-        peliScene = new Scene(peliPane,leveys,korkeus);
+        peliScene = new Scene(peliPane, leveys, korkeus);
         peliStage = new Stage();
         peliStage.setScene(peliScene);
 
@@ -76,32 +77,149 @@ public class PeliSetuppi extends ImageView {
 
     /**
      * Palauttaa peliruudun stagen
+     *
      * @return Stage peliStage
      */
-    public Stage getPeliStage(){
+    public Stage getPeliStage() {
         return peliStage;
     }
 
     /**
      * Tekee taustan
      */
-    private void teeTausta(){
+    private void teeTausta() {
 
-        Image taustaKuva = new Image("file:tausta.jpg",800,600,false,true);
+        Image taustaKuva = new Image("file:tausta.jpg", 800, 600, false, true);
         BackgroundImage tausta = new BackgroundImage(taustaKuva, BackgroundRepeat.NO_REPEAT, BackgroundRepeat.NO_REPEAT, BackgroundPosition.DEFAULT, null);
         peliPane.setBackground(new Background(tausta));
 
     }
 
 
+    /**
+     * Metodi, jolla hoidetaan ennätyksen lukeminen ja kirjoittaminen tiedostoon.
+     *
+     * @param aika
+     */
+    private void tulosLuokka(long aika) {
+        AtomicReference<String> nimiMerkki = new AtomicReference<>("");
+        AtomicReference<String> paivays = new AtomicReference<>("");
+        String filu = "ajat.txt";
+        long aika2 = aika;
+        String teskti = "";
+
+        boolean olikoEnkka = false;
+        long nykyinenEnnätys = 0;
+
+        // Muunnetaan tulevat millisekunnit sekunneiksi.
+        long sekuntit = aika2 / 1000;
+
+        // Tiedostonkäsittely
+        try {
+            File file = new File("ajat.txt");
+            Scanner scanner = new Scanner(file);
+
+            // Jos tiedosto on tyhjä, lisätään tämähetkinen aika sinne suoraan
+            if (!scanner.hasNext()) {
+                // Oli ennätys -> myöhemmin näytetään teksti
+                olikoEnkka = true;
+                FileWriter writer = new FileWriter(file);
+                writer.write(Long.toString(sekuntit));
+                writer.close();
+            }
+
+            // Luetaan edellinen ennätys
+            nykyinenEnnätys = scanner.nextLong();
+            scanner.close();
+
+            // Jos saatu aika on nopeampi kuin edellinen ennätys, kirjoitetaan uusi aika tiedostoon.
+            if (sekuntit < nykyinenEnnätys) {
+                FileWriter writer = new FileWriter(file);
+                writer.write(Long.toString(sekuntit));
+                writer.close();
+                olikoEnkka = true;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // Näytetään mennyt aika
+        Text ajat = new Text("Sinulla kesti pelin läpäisyssä: " + sekuntit + " sekuntia!");
+        ajat.setLayoutX(300);
+        ajat.setLayoutY(200);
+        ajat.setFont(Font.font("Copperplate", FontWeight.EXTRA_BOLD, 20));
+
+        // Jos oli ennätys, näytetään teksti, muuten näytetään vanha ennätys.
+        if (olikoEnkka) {
+            Text enkkaTeksti = new Text("!!UUSI ENNÄTYS!!");
+            enkkaTeksti.setLayoutX(300);
+            enkkaTeksti.setLayoutY(180);
+            enkkaTeksti.setFont(Font.font("Copperplate", FontWeight.EXTRA_BOLD, 30));
+            peliPane.getChildren().add(enkkaTeksti);
+
+            TextField nimiTallennus = new TextField("Kirjoita nimimerkki!");
+            nimiTallennus.setLayoutX(300);
+            nimiTallennus.setLayoutY(220);
+            peliPane.getChildren().add(nimiTallennus);
+
+            Button laheta = new Button("Lähetä");
+            laheta.setLayoutX(300);
+            laheta.setLayoutY(240);
+            peliPane.getChildren().add(laheta);
+
+            laheta.setOnAction(e -> {
+                nimiMerkki.set(nimiTallennus.getText());
+                DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+                LocalDateTime now = LocalDateTime.now();
+                paivays.set(dtf.format(now));
+
+                try {
+                    FileWriter writer = new FileWriter(filu, true);
+                    writer.write("\n");
+                    writer.write(nimiMerkki + " " + paivays);
+                    writer.close();
+                } catch (IOException E) {
+                    E.printStackTrace();
+                }
+
+            });
+
+        } else {
+
+            String teksti = null;
+            try {
+                File file = new File("ajat.txt");
+                Scanner scanner = new Scanner(file);
+
+
+                nykyinenEnnätys = Long.parseLong(scanner.nextLine());
+                teksti = scanner.nextLine();
+
+
+                scanner.close();
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+
+            Text edellinenParas = new Text("Tämän hetkinen paras: " + nykyinenEnnätys + " sekunttia." + "\nNimimerkki ja päiväys: " + teksti);
+            edellinenParas.setLayoutX(300);
+            edellinenParas.setLayoutY(250);
+            edellinenParas.setFont(Font.font("Copperplate", FontWeight.EXTRA_BOLD, 20));
+            peliPane.getChildren().add(edellinenParas);
+        }
+
+        peliPane.getChildren().add(ajat);
+    }
 
 
     /**
      * Tekee napin, jolla saadaan peli uudestaan käyntiin
      */
-    private void teeUudestaanNappi(){
+    private void teeUudestaanNappi() {
 
-        Nappulat uudestaanNappi = new Nappulat("Uudestaan?",20);
+        Nappulat uudestaanNappi = new Nappulat("Uudestaan?", 20);
         uudestaanNappi.setLayoutX(100);
         uudestaanNappi.setLayoutY(230);
 
@@ -120,13 +238,12 @@ public class PeliSetuppi extends ImageView {
     }
 
 
-
     /**
      * Tekee napin, jolla pääsee takaisin alkuruutuun
      */
-    private void teeTakaisinNappi(){
+    private void teeTakaisinNappi() {
 
-        Nappulat takaisinNappi = new Nappulat("Takaisin",20);
+        Nappulat takaisinNappi = new Nappulat("Takaisin", 20);
         takaisinNappi.setLayoutX(100);
         takaisinNappi.setLayoutY(400);
 
@@ -145,12 +262,10 @@ public class PeliSetuppi extends ImageView {
     }
 
 
-
-
     /**
      * Teksti, joka näkyy, jos peli on voitettu
      */
-    private void voititTeksti(){
+    private void voititTeksti() {
 
         Text teksti = new Text();
         teksti.setText("Voitit pelin!");
@@ -164,7 +279,7 @@ public class PeliSetuppi extends ImageView {
     /**
      * Teksti, joka näkyy, jos peli on hävitty
      */
-    private void havisitTeksti(){
+    private void havisitTeksti() {
 
         Text teksti = new Text();
         teksti.setText("Hävisit pelin :(");
@@ -179,70 +294,6 @@ public class PeliSetuppi extends ImageView {
 
 
 
-    /**
-     * Metodi, jolla hoidetaan ennätyksen lukeminen ja kirjoittaminen tiedostoon.
-     * @param aika
-     */
-    private void onkoEnnatys(long aika) {
-
-        boolean olikoEnkka = false;
-        long nykyinenEnnätys = 0;
-        //Muunnetaan tulevat miillisekunnit sekunneiksi.
-        long sekuntit = aika / 1000;
-
-        //Tiedostonkäsittely
-        try {
-            File file = new File("ajat.txt");
-            Scanner scanner = new Scanner(file);
-
-            //Jos tiedosto on tyhjä, lisätään tämähetkinen aika sinne suoraan
-            if(!scanner.hasNext()){
-
-                //Oli ennätys -> myöhemmin näytetään teksti
-                olikoEnkka = true;
-                FileWriter writer = new FileWriter(file);
-                writer.write(Long.toString(sekuntit));
-                writer.close();
-            }
-
-            //Luetaan edellinen ennätys
-            nykyinenEnnätys = scanner.nextLong();
-            scanner.close();
-
-            //Jos saatu aika on nopeampi, kuin edellinen ennätys, kirjoitetaan uusi aika tiedostoon.
-            if (sekuntit < nykyinenEnnätys) {
-                FileWriter writer = new FileWriter(file);
-                writer.write(Long.toString(sekuntit));
-                writer.close();
-                olikoEnkka = true;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        //Näytetään mennyt aika
-        Text ajat = new Text("Sinulla kesti pelin läpäisyssä:"+" "+ sekuntit+" "+"sekunttia!");
-        ajat.setLayoutX(300);
-        ajat.setLayoutY(200);
-        ajat.setFont(Font.font("Copperplate", FontWeight.EXTRA_BOLD, 20));
-
-        //Jos oli ennätys näytetään teksti, muuten näytetään vanha ennätys.
-        if(olikoEnkka){
-            Text enkkaTeksti = new Text("!!UUSI ENNÄTYS!!");
-            enkkaTeksti.setLayoutX(300);
-            enkkaTeksti.setLayoutY(180);
-            enkkaTeksti.setFont(Font.font("Copperplate", FontWeight.EXTRA_BOLD, 30));
-            peliPane.getChildren().add(enkkaTeksti);
-        } else {
-            Text edellinenParas = new Text("Tämän hetkinen paras:"+" "+nykyinenEnnätys+" "+"sekunttia");
-            edellinenParas.setLayoutX(300);
-            edellinenParas.setLayoutY(250);
-            edellinenParas.setFont(Font.font("Copperplate", FontWeight.EXTRA_BOLD, 20));
-            peliPane.getChildren().add(edellinenParas);
-        }
-
-        peliPane.getChildren().add(ajat);
-    }
 
 
 
@@ -430,7 +481,8 @@ public class PeliSetuppi extends ImageView {
                         voititTeksti();
                         teeTakaisinNappi();
                         teeUudestaanNappi();
-                        onkoEnnatys(lopullinenAika);
+                        //onkoEnnatys(lopullinenAika);
+                        tulosLuokka(lopullinenAika);
                         return;
                     }
 
